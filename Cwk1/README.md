@@ -87,3 +87,180 @@ minutes to instant
 - give me an overview of features in spectacular and how i can use it in my project with drf
 
 - prefix vs basename in rest framework router.register
+
+- how do i add authentication requirements to endpoints. i want tool endpoints to be read only for normal users, any operation for admin/superuser
+
+✅ Step 1 — Create a Custom Permission Class
+
+Create a new file:
+
+tools/permissions.py
+
+Add:
+
+from rest_framework.permissions import BasePermission, SAFE_METHODS
+
+class IsAdminOrReadOnly(BasePermission):
+    """
+    Allow read-only access to anyone.
+    Only admins/superusers can modify.
+    """
+
+    def has_permission(self, request, view):
+        # SAFE_METHODS = GET, HEAD, OPTIONS
+        if request.method in SAFE_METHODS:
+            return True
+        
+        # Write permissions only for admin users
+        return request.user and request.user.is_staff
+Why is_staff and not is_superuser?
+
+is_staff → Django admin access
+
+is_superuser → full unrestricted access
+
+For coursework clarity, is_staff is standard.
+
+If you want strictly superusers only:
+
+return request.user and request.user.is_superuser
+✅ Step 2 — Apply It to Your ViewSet
+
+In your ToolViewSet:
+
+from rest_framework.viewsets import ModelViewSet
+from .models import Tool
+from .serializers import ToolSerializer
+from .permissions import IsAdminOrReadOnly
+
+class ToolViewSet(ModelViewSet):
+    queryset = Tool.objects.all()
+    serializer_class = ToolSerializer
+    permission_classes = [IsAdminOrReadOnly]
+
+That’s it.
+
+🔐 Step 3 — Ensure Authentication Is Enabled
+
+In settings.py, make sure you have:
+
+REST_FRAMEWORK = {
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.AllowAny",  # default for other views
+    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+    ],
+}
+
+- validate doesnt run on patch
+Good — this is a very important DRF behaviour detail.
+
+You're correct:
+
+validate() does not behave the way you expect on PATCH.
+
+Here’s why.
+
+🔍 Why validate() “doesn’t run” on PATCH
+
+It does run, but:
+
+On PATCH (partial update):
+
+Only the fields provided are in attrs
+
+Missing fields are NOT included
+
+So your logic breaks if you expect both username and password to exist
+
+Example PATCH:
+
+{
+  "password": "john"
+}
+
+Inside validate(self, attrs):
+
+attrs == {
+    "password": "john"
+}
+
+There is no username in attrs.
+
+So when you do:
+
+user = User(
+    username=attrs.get("username"),
+    email=attrs.get("email"),
+)
+
+Both are None.
+
+So Django can’t compare password to username.
+So similarity validation does nothing.
+
+✅ Correct Solution: Use self.instance During Update
+
+When updating, DRF gives you the existing object via self.instance.
+
+So you must merge:
+
+Existing user values
+
+New incoming values
+
+✅ Correct Implementation
+def validate(self, attrs):
+    # If updating, use existing instance values
+    if self.instance:
+        username = attrs.get("username", self.instance.username)
+        email = attrs.get("email", self.instance.email)
+    else:
+        username = attrs.get("username")
+        email = attrs.get("email")
+
+    password = attrs.get("password")
+
+    if password:
+        temp_user = User(
+            username=username,
+            email=email,
+        )
+        validate_password(password, temp_user)
+
+    return attrs
+🔥 Why This Works
+
+On PATCH:
+
+{
+  "password": "john"
+}
+
+If current user is:
+
+username = "john"
+
+Then:
+
+attrs.get("username") → None
+
+fallback to self.instance.username → "john"
+
+similarity validator now works
+
+So "password": "john" will correctly fail.
+
+🧠 Key Concept
+
+DRF update flow:
+
+POST → self.instance is None
+
+PUT/PATCH → self.instance is the object being updated
+
+PATCH → attrs only contains changed fields
+
+You must manually merge old + new values during validation.
