@@ -85,3 +85,5 @@ minutes to instant
 - what python frameworks are there that work with django to generate documentation. i also want to be able to add structured docstrings to functions that will be included
 
 - give me an overview of features in spectacular and how i can use it in my project with drf
+
+- prefix vs basename in rest framework router.register

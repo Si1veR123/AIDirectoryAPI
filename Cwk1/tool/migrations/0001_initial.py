@@ -15,29 +15,25 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Accessibility',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=255)),
+                ('name', models.CharField(max_length=255, primary_key=True)),
             ],
         ),
         migrations.CreateModel(
             name='ContextWindow',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=255)),
+                ('name', models.CharField(max_length=255, primary_key=True)),
             ],
         ),
         migrations.CreateModel(
             name='Developer',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=255)),
+                ('name', models.CharField(max_length=255, primary_key=True)),
             ],
         ),
         migrations.CreateModel(
             name='Domain',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=255)),
+                ('name', models.CharField(max_length=255, primary_key=True)),
             ],
         ),
         migrations.CreateModel(

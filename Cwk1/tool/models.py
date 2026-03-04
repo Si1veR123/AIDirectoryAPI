@@ -14,26 +14,26 @@ Accessibility:Information on how the tool is accessed (e.g., Web App, Desktop, M
 Website_URL:The direct hyperlink to the tool's official landing page or documentation.
 """
 class Domain(models.Model):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, primary_key=True)
 
     def __str__(self):
         return self.name
 
 class Developer(models.Model):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, primary_key=True)
 
     def __str__(self):
         return self.name
 
 
 class Accessibility(models.Model):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, primary_key=True)
 
     def __str__(self):
         return self.name
 
 class ContextWindow(models.Model):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, primary_key=True)
 
     def __str__(self):
         return self.name

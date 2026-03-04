@@ -3,10 +3,9 @@ from rest_framework import serializers
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
-
     class Meta:
         model = get_user_model()
-        fields = ['username', 'email', 'password']
+        fields = ['username', 'email', 'password', 'interested_domain', 'date_of_birth', 'bio']
 
     def create(self, validated_data):
         user = get_user_model().objects.create_user(
