@@ -41,7 +41,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'user',
-    'tool'
+    'tool',
+    'drf_spectacular'
 ]
 
 MIDDLEWARE = [
@@ -129,7 +130,14 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
+    ),
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "AI Tools API",
+    "DESCRIPTION": "API for navigating a directory of AI tools",
+    "VERSION": "0.0.1",
 }
 
 AUTH_USER_MODEL = 'user.CustomUser'
