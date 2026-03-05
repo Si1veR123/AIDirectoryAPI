@@ -264,3 +264,294 @@ PUT/PATCH → self.instance is the object being updated
 PATCH → attrs only contains changed fields
 
 You must manually merge old + new values during validation.
+
+- Suggest ways to extend my current project that implement modern standards, complex database structures and more advanced endpoints
+1. Data Model & CRUD Extensions
+
+You already have a basic data model with endpoints. To go beyond the minimum:
+
+Relational enhancements
+
+Introduce related models with foreign keys and nested CRUD operations.
+
+Example: User → Project → Tool hierarchy, where each user can have multiple projects and each project multiple tools.
+
+Implement cascade or restricted deletes, and show how API handles them (complex behavior = originality).
+
+GraphQL Option:
+
+Consider a GraphQL API for nested data retrieval.
+
+Example: query a user and get all projects + tools in a single request with filtering and sorting.
+
+Justify the choice: reduces over-fetching, flexible for GenAI clients that may want contextual data dynamically.
+
+2. Advanced Endpoint Ideas
+
+Beyond basic CRUD, consider endpoints that add value:
+
+Search & Filter:
+
+GET /tools?name=drill&category=hardware
+
+Could integrate full-text search using SQLite FTS or PostgreSQL.
+
+Batch Operations:
+
+POST /tools/batch to create multiple tools at once, return per-item status.
+
+Analytics Endpoints:
+
+Count of tools per user/project, average usage, or last updated timestamp.
+
+Custom Actions / GenAI Integration:
+
+Example: /tools/suggest → takes a partial description and returns AI-suggested new tools (leveraging OpenAI GPT or similar).
+
+Could be modeled as a “creative assistant” endpoint, directly connecting your API to GenAI.
+
+3. Error Handling & Status Codes
+
+Expand your API to handle business logic errors, not just 404/500.
+
+Example: “Cannot delete project with active tools” → 409 Conflict.
+
+Demonstrate nested validation, e.g., updating a tool requires valid project ownership.
+
+4. Authentication & Personalisation
+
+Add JWT or session-based auth with per-user data isolation.
+
+Provide role-based endpoints:
+
+Admin can CRUD all projects/tools, users can only CRUD their own.
+
+Extend with rate-limiting per user for creative AI endpoints to show production awareness.
+
+5. Novel Features / Generative AI Applications
+
+This is where you can score high marks:
+
+AI-Assisted CRUD
+
+POST /tools/auto-create → user provides a description, AI fills in missing fields, tags, or categories.
+
+Could use prompt engineering to generate realistic tool specs.
+
+Data Augmentation / Enrichment
+
+AI endpoint can generate example use cases, images, or documentation for each tool.
+
+Predictive Suggestions
+
+/tools/recommend → suggest similar tools based on existing user projects. Could use embeddings or GPT-4 style similarity searches.
+
+Interactive Documentation / Playground
+
+Embed Redoc or Swagger UI with live examples.
+
+AI could generate example payloads automatically from your models.
+
+6. Design / Architecture Innovation
+
+Consider async FastAPI or Django Channels for real-time endpoints.
+
+Use caching (Redis) for repeated AI queries to reduce latency.
+
+Implement OpenAPI / GraphQL schema generation, emphasizing best practices.
+
+- make a viewset that has parameters q (search query for field ai_name), and a parameter for each field in Tool. it should check if the value is equal to the field. for the integer fields, it should have a parameter field-max and field-min that returns results between the 2 values. if only field-max is given, return everything less than the value and vice versa for field-min. also have a sort-by and order=desc/asc parameter that takes a field and sorts by the given field. add documentation.
+
+Below is a clean DRF ViewSet implementation that supports everything you asked:
+
+Features:
+
+q → search ai_name
+
+field=value → exact match filter for every Tool field
+
+field-min / field-max → range filtering for integer fields
+
+sort-by → choose field to sort
+
+order=asc|desc
+
+documented query parameters using drf-spectacular
+
+This assumes:
+
+Tool model exists
+
+you are using DRF + drf-spectacular
+
+ToolSearchViewSet
+from rest_framework.viewsets import ViewSet
+from rest_framework.response import Response
+from django.db.models import Q
+from drf_spectacular.utils import extend_schema, OpenApiParameter
+from .models import Tool
+from .serializers import ToolSerializer
+
+
+class ToolSearchViewSet(ViewSet):
+
+    @extend_schema(
+        description="""
+Search tools using flexible query parameters.
+
+Query Parameters
+----------------
+q:
+    Searches the ai_name field.
+
+Field filters:
+    Any Tool field can be filtered using ?field=value.
+
+Range filters for integer fields:
+    ?field-min=value
+    ?field-max=value
+
+Examples:
+    /tools/search?q=vision  
+    /tools/search?category=nlp  
+    /tools/search?downloads-min=1000  
+    /tools/search?downloads-min=1000&downloads-max=10000  
+
+Sorting:
+    sort-by=<field>
+    order=asc|desc
+
+Examples:
+    /tools/search?sort-by=downloads&order=desc
+""",
+        parameters=[
+            OpenApiParameter(
+                name="q",
+                description="Search query for ai_name",
+                required=False,
+                type=str
+            ),
+            OpenApiParameter(
+                name="sort-by",
+                description="Field to sort by",
+                required=False,
+                type=str
+            ),
+            OpenApiParameter(
+                name="order",
+                description="Sorting order (asc or desc)",
+                required=False,
+                type=str
+            ),
+        ],
+    )
+    def list(self, request):
+
+        queryset = Tool.objects.all()
+        params = request.query_params
+
+        # --- search query ---
+        q = params.get("q")
+        if q:
+            queryset = queryset.filter(ai_name__icontains=q)
+
+        # --- dynamic field filtering ---
+        for field in Tool._meta.fields:
+
+            name = field.name
+
+            # skip id field if desired
+            if name == "id":
+                continue
+
+            # exact match filter
+            value = params.get(name)
+            if value is not None:
+                queryset = queryset.filter(**{name: value})
+
+            # range filters for integer fields
+            if field.get_internal_type() in ["IntegerField", "BigIntegerField", "FloatField"]:
+
+                min_param = params.get(f"{name}-min")
+                max_param = params.get(f"{name}-max")
+
+                if min_param is not None:
+                    queryset = queryset.filter(**{f"{name}__gte": min_param})
+
+                if max_param is not None:
+                    queryset = queryset.filter(**{f"{name}__lte": max_param})
+
+        # --- sorting ---
+        sort_by = params.get("sort-by")
+        order = params.get("order", "asc")
+
+        if sort_by:
+            if order == "desc":
+                sort_by = f"-{sort_by}"
+            queryset = queryset.order_by(sort_by)
+
+        serializer = ToolSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+- does the documentation support having a dynamic number of fields
+Short answer: not really.
+OpenAPI (which tools like drf-spectacular generate) expects the set of query parameters to be known at schema-generation time. A truly runtime-dynamic set of parameters isn’t part of the spec.
+
+But there are three practical approaches.
+
+1️⃣ Generate Parameters Dynamically at Schema Time (Best Option)
+
+You can dynamically generate parameters from the model fields when the schema is built. The number of parameters is dynamic in your code, but the generated schema is still static.
+
+Example:
+
+from drf_spectacular.utils import extend_schema, OpenApiParameter
+from .models import Tool
+
+
+def build_search_params():
+    params = [
+        OpenApiParameter("q", str, description="Search ai_name"),
+        OpenApiParameter("sort-by", str, description="Field to sort by"),
+        OpenApiParameter("order", str, description="asc or desc"),
+    ]
+
+    for field in Tool._meta.fields:
+        name = field.name
+
+        params.append(
+            OpenApiParameter(
+                name=name,
+                type=str,
+                description=f"Exact match filter for {name}",
+                required=False,
+            )
+        )
+
+        if field.get_internal_type() in ["IntegerField", "FloatField"]:
+            params.append(
+                OpenApiParameter(
+                    name=f"{name}-min",
+                    type=float,
+                    description=f"Minimum {name}",
+                    required=False,
+                )
+            )
+            params.append(
+                OpenApiParameter(
+                    name=f"{name}-max",
+                    type=float,
+                    description=f"Maximum {name}",
+                    required=False,
+                )
+            )
+
+    return params
+
+Then:
+
+@extend_schema(parameters=build_search_params())
+def list(self, request):
+
+✔ Docs automatically update if your model changes
+✔ Looks very polished for coursework
