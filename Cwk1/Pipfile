@@ -10,7 +10,7 @@ djangorestframework-simplejwt = "*"
 kagglehub = "*"
 drf-spectacular = "*"
 
-[dev-packages]
-
 [requires]
 python_version = "3.13"
+
+[dev-packages]

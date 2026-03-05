@@ -555,3 +555,97 @@ def list(self, request):
 
 ✔ Docs automatically update if your model changes
 ✔ Looks very polished for coursework
+
+- i want to get an update when a tool is given a specific domain. how should i do this? can i detect when a new foreign key to a domain is created in the domain model? or should i do this in tool serializer/viewset?
+Better: Detect If The Domain Actually Changed
+
+Use pre_save to compare the old value.
+
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
+from .models import Tool
+
+@receiver(pre_save, sender=Tool)
+def detect_domain_change(sender, instance, **kwargs):
+
+    if not instance.pk:
+        return  # new object
+
+    old = Tool.objects.get(pk=instance.pk)
+
+    if old.domain != instance.domain:
+        print(
+            f"Domain changed from {old.domain} to {instance.domain}"
+        )
+
+This triggers when:
+
+Tool A
+domain = NLP → Vision
+Where to Put This
+
+Create a file:
+
+tools/signals.py
+
+Then register it in:
+
+tools/apps.py
+class ToolsConfig(AppConfig):
+    name = "tools"
+
+    def ready(self):
+        import tools.signals
+
+- i want to send an email on signal. should i do this instantly or schedule it with a job scheduler (celery?)
+For your use case (send an email when a tool gets assigned a domain), the decision depends on reliability and user experience, but for most APIs the best practice is:
+
+Trigger the event with a signal → send the email asynchronously with a task queue.
+
+So the architecture becomes:
+
+Tool saved
+   ↓
+Django signal fires
+   ↓
+enqueue background task
+   ↓
+worker sends email
+
+This prevents API requests from blocking while the email is sent.
+
+Why You Should Not Send Email Directly in the Signal
+
+If you do:
+
+send_mail(...)
+
+inside the signal:
+
+Problems:
+
+Slow API response
+
+SMTP calls can take seconds.
+
+Failure breaks the request
+
+Email server timeout → API request fails.
+
+Poor scalability
+
+Many events → your API becomes slow.
+
+Best Architecture
+
+Use a task queue like Celery.
+
+Flow:
+
+Tool save
+   ↓
+Signal
+   ↓
+Celery task
+   ↓
+Email sent by worker

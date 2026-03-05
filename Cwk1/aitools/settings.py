@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -137,4 +138,20 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "0.0.1",
 }
 
+TASKS = {"default": {"BACKEND": "django.tasks.backends.immediate.ImmediateBackend"}}
+
 AUTH_USER_MODEL = 'user.CustomUser'
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.aol.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+email_credentials = os.environ.get("AIDIRECTORYAPI_EMAIL_CREDENTIALS", None)
+
+if email_credentials:
+    EMAIL_HOST_USER, EMAIL_HOST_PASSWORD = email_credentials.split(";")
+    DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+else:
+    EMAIL_HOST_USER = None
+    EMAIL_HOST_PASSWORD = None
+    DEFAULT_FROM_EMAIL = None
