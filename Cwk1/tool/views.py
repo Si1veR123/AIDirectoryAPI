@@ -2,7 +2,7 @@ from rest_framework.viewsets import ModelViewSet
 from .models import Tool, Developer, Domain, Accessibility, ContextWindow
 from .serializers import ToolSerializer, DeveloperSerializer, DomainSerializer, AccessibilitySerializer, ContextWindowSerializer
 from rest_framework.viewsets import ViewSet
-from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 @extend_schema(tags=['Developers'], description="Manage tool developers. Read only for normal users.")
@@ -25,16 +25,27 @@ class ContextWindowViewSet(ModelViewSet):
     queryset = ContextWindow.objects.all()
     serializer_class = ContextWindowSerializer
 
-@extend_schema(tags=['Tools'], description="Manage AI tools. Read only for normal users.")
+class ToolPagination(PageNumberPagination):
+    page_size = 20  # default page size
+    page_size_query_param = 'page_size'  # client can set page size
+    max_page_size = 100
+
+@extend_schema(tags=['Tools'], description="Manage AI tools. Read only for normal users.", parameters=[
+    OpenApiParameter("page", int, description="Page number", required=False, default=1),
+    OpenApiParameter("page_size", int, description=f"Results per page. Max: {ToolPagination.max_page_size}", required=False, default=ToolPagination.page_size),
+])
 class ToolViewSet(ModelViewSet):
     queryset = Tool.objects.all()
     serializer_class = ToolSerializer
+    pagination_class = ToolPagination
 
 def build_search_params():
     params = [
         OpenApiParameter("q", str, description="Search ai_name"),
         OpenApiParameter("sort-by", str, description="Field to sort by"),
         OpenApiParameter("order", str, description="asc or desc"),
+        OpenApiParameter("page", int, description="Page number", required=False, default=1),
+        OpenApiParameter("page_size", int, description=f"Results per page. Max: {ToolPagination.max_page_size}", required=False, default=ToolPagination.page_size),
     ]
 
     for field in Tool._meta.fields:
@@ -72,44 +83,45 @@ def build_search_params():
 class ToolSearchViewSet(ViewSet):
     permission_classes = []
     serializer_class = ToolSerializer
+    pagination_class = ToolPagination
 
     @extend_schema(
         description="""
-Search tools using flexible query parameters.
+Search tools using flexible query parameters with pagination support.
 
 Query Parameters
 ----------------
 q:
-    Searches the ai_name field.
+    Searches the ai_name field for partial matches.
 
 Field filters:
     Any Tool field can be filtered using ?field=value.
 
-Range filters for integer fields:
+Range filters for numeric fields:
     ?field-min=value
     ?field-max=value
-
-Examples:
-    /tools/search?q=vision  
-    /tools/search?primary_domain=nlp  
-    /tools/search?popularity_votes-min=1000
-    /tools/search?popularity_votes-min=1000&popularity_votes-max=10000  
 
 Sorting:
     sort-by=<field>
     order=asc|desc
 
+Pagination:
+    page: The page number to retrieve (default=1)
+    page_size: Number of results per page (default=20, max=100)
+
 Examples:
-    /tools/search?sort-by=popularity_votes&order=desc
+    /tools/search?q=vision
+    /tools/search?primary_domain=nlp
+    /tools/search?popularity_votes-min=1000
+    /tools/search?popularity_votes-min=1000&popularity_votes-max=10000
+    /tools/search?sort-by=popularity_votes&order=desc&page=2&page_size=50
 """,
-        parameters=build_search_params(),
+        parameters=build_search_params(),  # your existing dynamic params builder
         tags=['Tool Search']
     )
     def list(self, request):
-
         queryset = Tool.objects.all()
         params = request.query_params
-        serializer = ToolSerializer
 
         # --- search query ---
         q = params.get("q")
@@ -118,10 +130,7 @@ Examples:
 
         # --- dynamic field filtering ---
         for field in Tool._meta.fields:
-
             name = field.name
-
-            # skip id field if desired
             if name == "id":
                 continue
 
@@ -130,26 +139,25 @@ Examples:
             if value is not None:
                 queryset = queryset.filter(**{name: value})
 
-            # range filters for integer fields
+            # range filters for numeric fields
             if field.get_internal_type() in ["IntegerField", "BigIntegerField", "FloatField"]:
-
                 min_param = params.get(f"{name}-min")
                 max_param = params.get(f"{name}-max")
-
                 if min_param is not None:
                     queryset = queryset.filter(**{f"{name}__gte": min_param})
-
                 if max_param is not None:
                     queryset = queryset.filter(**{f"{name}__lte": max_param})
 
         # --- sorting ---
         sort_by = params.get("sort-by")
         order = params.get("order", "asc")
-
         if sort_by:
             if order == "desc":
                 sort_by = f"-{sort_by}"
             queryset = queryset.order_by(sort_by)
 
-        serializer = ToolSerializer(queryset, many=True)
-        return Response(serializer.data)
+        # --- pagination ---
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(queryset, request)
+        serializer = ToolSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
