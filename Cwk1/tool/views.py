@@ -4,6 +4,7 @@ from .serializers import ToolSerializer, DeveloperSerializer, DomainSerializer, 
 from rest_framework.viewsets import ViewSet
 from rest_framework.pagination import PageNumberPagination
 from drf_spectacular.utils import extend_schema, OpenApiParameter
+from rest_framework.response import Response
 
 @extend_schema(tags=['Developers'], description="Manage tool developers. Read only for normal users.")
 class DeveloperViewSet(ModelViewSet):
@@ -106,8 +107,8 @@ Sorting:
     order=asc|desc
 
 Pagination:
-    page: The page number to retrieve (default=1)
-    page_size: Number of results per page (default=20, max=100)
+    page: The page number to retrieve (default=1, optional)
+    page_size: Number of results per page (default=20, max=100, optional)
 
 Examples:
     /tools/search?q=vision
@@ -157,7 +158,12 @@ Examples:
             queryset = queryset.order_by(sort_by)
 
         # --- pagination ---
-        paginator = self.pagination_class()
-        page = paginator.paginate_queryset(queryset, request)
-        serializer = ToolSerializer(page, many=True)
-        return paginator.get_paginated_response(serializer.data)
+        if 'page' in params:
+            paginator = self.pagination_class()
+            page = paginator.paginate_queryset(queryset, request)
+            serializer = ToolSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+        else:
+            # no pagination, return full result
+            serializer = ToolSerializer(queryset, many=True)
+            return Response(serializer.data)
