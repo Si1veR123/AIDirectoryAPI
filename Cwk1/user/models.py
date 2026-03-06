@@ -7,3 +7,4 @@ class CustomUser(AbstractUser):
     email_alerts = models.BooleanField(default=False)
     date_of_birth = models.DateField(blank=True, null=True)
     bio = models.TextField(blank=True, null=True)
+    favourite_tools = models.ManyToManyField('tool.Tool', blank=True)

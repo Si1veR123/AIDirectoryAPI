@@ -146,6 +146,8 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.aol.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
+
+# in the form email;app_password
 email_credentials = os.environ.get("AIDIRECTORYAPI_EMAIL_CREDENTIALS", None)
 
 if email_credentials:

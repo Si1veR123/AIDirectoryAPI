@@ -5,7 +5,6 @@ from rest_framework.viewsets import ViewSet
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
-# Create your views here.
 class DeveloperViewSet(ModelViewSet):
     queryset = Developer.objects.all()
     serializer_class = DeveloperSerializer
