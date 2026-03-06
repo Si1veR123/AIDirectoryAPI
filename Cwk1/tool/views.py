@@ -5,22 +5,27 @@ from rest_framework.viewsets import ViewSet
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
+@extend_schema(tags=['Developers'], description="Manage tool developers. Read only for normal users.")
 class DeveloperViewSet(ModelViewSet):
     queryset = Developer.objects.all()
     serializer_class = DeveloperSerializer
 
+@extend_schema(tags=['Domains'], description="Manage tool domains. Read only for normal users.")
 class DomainViewSet(ModelViewSet):
     queryset = Domain.objects.all()
     serializer_class = DomainSerializer
 
+@extend_schema(tags=['Accessibilities'], description="Manage tool accessibilities. Read only for normal users.")
 class AccessibilityViewSet(ModelViewSet):
     queryset = Accessibility.objects.all()
     serializer_class = AccessibilitySerializer
 
+@extend_schema(tags=['Context Windows'], description="Manage context windows. Read only for normal users.")
 class ContextWindowViewSet(ModelViewSet):
     queryset = ContextWindow.objects.all()
     serializer_class = ContextWindowSerializer
 
+@extend_schema(tags=['Tools'], description="Manage AI tools. Read only for normal users.")
 class ToolViewSet(ModelViewSet):
     queryset = Tool.objects.all()
     serializer_class = ToolSerializer
@@ -65,6 +70,8 @@ def build_search_params():
     return params
 
 class ToolSearchViewSet(ViewSet):
+    permission_classes = []
+    serializer_class = ToolSerializer
 
     @extend_schema(
         description="""
@@ -95,12 +102,14 @@ Sorting:
 Examples:
     /tools/search?sort-by=popularity_votes&order=desc
 """,
-        parameters=build_search_params()
+        parameters=build_search_params(),
+        tags=['Tool Search']
     )
     def list(self, request):
 
         queryset = Tool.objects.all()
         params = request.query_params
+        serializer = ToolSerializer
 
         # --- search query ---
         q = params.get("q")

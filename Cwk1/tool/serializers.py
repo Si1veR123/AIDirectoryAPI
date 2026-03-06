@@ -30,3 +30,8 @@ class ToolSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tool
         fields = '__all__'
+
+class FavouriteToolSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tool
+        fields = ['ai_name']

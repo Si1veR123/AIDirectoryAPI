@@ -38,7 +38,8 @@ class SecureUserSerializer(serializers.ModelSerializer):
             # Normal users can only modify themselves
             if not is_create and self.instance != request_user:
                 raise serializers.ValidationError(
-                    "You can only modify your own account."
+                    "You can only modify your own account.",
+                    code="permission_denied"
                 )
 
         # Check field permissions

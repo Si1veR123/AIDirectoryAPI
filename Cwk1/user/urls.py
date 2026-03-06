@@ -1,15 +1,37 @@
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from user.views import RegisterView, CurrentUserDetailView, UserDetailViewSet
+from user.views import RegisterView, CurrentUserDetailView, UserViewSet, FavouriteToolViewSet
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
-router.register(r'manage', UserDetailViewSet, basename='user-manage')
+router.register(r'', UserViewSet, basename='user')
 
 urlpatterns = [
-    path('register/', RegisterView.as_view(), name='register'),
-    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('current/', CurrentUserDetailView.as_view(), name='current_user'),
-    path('', include(router.urls))
+    path('register/', RegisterView.as_view()),
+    path('token/', TokenObtainPairView.as_view()),
+    path('token/refresh/', TokenRefreshView.as_view()),
+
+    path('current/', CurrentUserDetailView.as_view()),
+
+    path('', include(router.urls)),
+
+    path(
+        'user/current/favourites/',
+        FavouriteToolViewSet.as_view({'get': 'list', 'post': 'create'})
+    ),
+
+    path(
+        'user/current/favourites/<str:ai_name>/',
+        FavouriteToolViewSet.as_view({'delete': 'destroy'})
+    ),
+
+    path(
+        '<int:user_id>/favourites/',
+        FavouriteToolViewSet.as_view({'get': 'list', 'post': 'create'})
+    ),
+
+    path(
+        '<int:user_id>/favourites/<str:ai_name>/',
+        FavouriteToolViewSet.as_view({'delete': 'destroy'})
+    ),
 ]
