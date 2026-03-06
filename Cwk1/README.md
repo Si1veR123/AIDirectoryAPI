@@ -649,3 +649,24 @@ Signal
 Celery task
    ↓
 Email sent by worker
+
+- help me set up rate limiting in django
+
+Rate limiting prevents users from spamming endpoints, especially important if you have AI endpoints that are resource-heavy.
+
+Option A: Use Django REST Framework’s built-in throttling
+# settings.py
+REST_FRAMEWORK = {
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.AnonRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'user': '100/hour',   # logged-in users
+        'anon': '20/hour',    # anonymous users
+    }
+}
+
+UserRateThrottle applies per authenticated user.
+
+AnonRateThrottle applies per IP for anonymous users.
