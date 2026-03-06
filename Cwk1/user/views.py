@@ -3,7 +3,7 @@ from rest_framework.viewsets import ModelViewSet, ViewSet
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from django.contrib.auth import get_user_model
 from .serializers import SecureUserSerializer
-from tool.serializers import FavouriteToolSerializer
+from tool.serializers import ToolNameSerializer
 from tool.models import Tool
 from rest_framework.response import Response
 from rest_framework import status
@@ -40,7 +40,7 @@ description="""Manage favourite tools for users. Endpoints take the ai_name fiel
 - Staff users can manage favourites for any user.""")
 class FavouriteToolViewSet(ViewSet):
     permission_classes = [IsAuthenticated]
-    serializer_class = FavouriteToolSerializer
+    serializer_class = ToolNameSerializer
 
     def get_user(self):
         user_id = self.kwargs.get("user_id")
@@ -55,28 +55,29 @@ class FavouriteToolViewSet(ViewSet):
 
         return get_object_or_404(get_user_model(), pk=user_id)
 
-    def list(self, request, user_id=None):
+    def list(self, request):
         user = self.get_user()
-        serializer = FavouriteToolSerializer(user.favourite_tools.all(), many=True)
+        serializer = ToolNameSerializer(user.favourite_tools.all(), many=True)
         return Response(serializer.data)
 
-    def create(self, request, user_id=None):
+    @extend_schema(
+        request=ToolNameSerializer,
+        responses={201: None},
+        description="Add a tool to favourites."
+    )
+    def create(self, request):
         user = self.get_user()
 
-        serializer = FavouriteToolSerializer(data=request.data)
+        serializer = ToolNameSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         tool = serializer.validated_data["ai_name"]
         tool = get_object_or_404(Tool, ai_name=tool)
-
         user.favourite_tools.add(tool)
 
-        return Response(
-            {"detail": "Tool added to favourites"},
-            status=status.HTTP_201_CREATED
-        )
+        return Response(status=status.HTTP_201_CREATED)
 
-    def destroy(self, request, ai_name=None, user_id=None):
+    def destroy(self, request, ai_name=None):
         user = self.get_user()
 
         tool = get_object_or_404(Tool, ai_name=ai_name)

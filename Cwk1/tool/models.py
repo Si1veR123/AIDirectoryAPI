@@ -51,3 +51,11 @@ class Tool(models.Model):
     accessibility = models.ForeignKey(Accessibility, on_delete=models.SET_NULL, null=True)
     popularity_votes = models.IntegerField(default=0)
     website_url = models.URLField()
+    embedding = models.JSONField(null=True, blank=True)
+
+class RecommendationResults(models.Model):
+    user = models.ForeignKey('user.CustomUser', on_delete=models.CASCADE)
+    query = models.TextField()
+    recommended_tools = models.ManyToManyField(Tool, blank=True)
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(blank=True, null=True)

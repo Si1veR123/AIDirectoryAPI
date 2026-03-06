@@ -9,6 +9,10 @@ djangorestframework = "*"
 djangorestframework-simplejwt = "*"
 kagglehub = "*"
 drf-spectacular = "*"
+sentence-transformers = "*"
+numpy = "*"
+scikit-learn = "*"
+channels = "*"
 
 [requires]
 python_version = "3.13"

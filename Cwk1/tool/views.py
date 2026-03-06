@@ -1,10 +1,15 @@
 from rest_framework.viewsets import ModelViewSet
-from .models import Tool, Developer, Domain, Accessibility, ContextWindow
-from .serializers import ToolSerializer, DeveloperSerializer, DomainSerializer, AccessibilitySerializer, ContextWindowSerializer
+from .models import Tool, Developer, Domain, Accessibility, ContextWindow, RecommendationResults
+from .serializers import ToolSerializer, DeveloperSerializer, DomainSerializer, AccessibilitySerializer, ContextWindowSerializer, RecommendationResultsSerializer, RecommendationResponseSerializer, RecommendationRequestSerializer
 from rest_framework.viewsets import ViewSet
 from rest_framework.pagination import PageNumberPagination
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from .tasks import create_recommendation
+from django.urls import reverse
+from django.conf import settings
+
 
 @extend_schema(tags=['Developers'], description="Manage tool developers. Read only for normal users.")
 class DeveloperViewSet(ModelViewSet):
@@ -81,16 +86,11 @@ def build_search_params():
 
     return params
 
-class ToolSearchViewSet(ViewSet):
-    permission_classes = []
-    serializer_class = ToolSerializer
-    pagination_class = ToolPagination
-
-    @extend_schema(
+@extend_schema(
         description="""
 Search tools using flexible query parameters with pagination support.
 
-Query Parameters
+Usage
 ----------------
 q:
     Searches the ai_name field for partial matches.
@@ -117,9 +117,14 @@ Examples:
     /tools/search?popularity_votes-min=1000&popularity_votes-max=10000
     /tools/search?sort-by=popularity_votes&order=desc&page=2&page_size=50
 """,
-        parameters=build_search_params(),  # your existing dynamic params builder
-        tags=['Tool Search']
-    )
+    parameters=build_search_params(),  # your existing dynamic params builder
+    tags=['Tool Search']
+)
+class ToolSearchViewSet(ViewSet):
+    permission_classes = []
+    serializer_class = ToolSerializer
+    pagination_class = ToolPagination
+
     def list(self, request):
         queryset = Tool.objects.all()
         params = request.query_params
@@ -167,3 +172,109 @@ Examples:
             # no pagination, return full result
             serializer = ToolSerializer(queryset, many=True)
             return Response(serializer.data)
+
+
+class RecommendToolView(ViewSet):
+    queryset = RecommendationResults.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Recommendations"],
+        description="Create a recommendation request based on a query.",
+        request=RecommendationRequestSerializer,
+        responses={
+            201: RecommendationResponseSerializer,
+            400: OpenApiResponse(description="Query parameter 'q' is required"),
+            401: OpenApiResponse(description="Authentication required"),
+        },
+    )
+    def create(self, request, *args, **kwargs):
+        query = request.data.get("q")
+        
+        top_n = max(1, min(int(request.data.get("top_n", 5)), 100))
+        if not query:
+            return Response({"detail": "Query parameter 'q' is required"}, status=400)
+        
+        if not request.user.is_authenticated:
+            return Response({"detail": "Authentication required"}, status=401)
+
+        results = RecommendationResults.objects.create(query=query, user=request.user)
+        create_recommendation.enqueue(results_id=results.id, query=query, top_n=top_n)
+
+        return Response({
+            "detail": "Recommendation created successfully",
+            "results_id": results.id,
+            "results_url_http": reverse('recommendation-results-detail', kwargs={'pk': results.id}),
+            "results_url_ws": reverse('recommendation-results-ws', kwargs={'results_id': results.id}, urlconf=settings.CHANNELS_URLCONF),
+        }, status=201)
+    
+    @extend_schema(
+        tags=['Recommendations'],
+        description="Retrieve recommendation results using results_id. Only the user who created the request or staff can access the results.",
+        responses={
+            200: RecommendationResultsSerializer,
+            202: OpenApiResponse(RecommendationResultsSerializer, description="Recommendation is still being processed"),
+            403: OpenApiResponse(description="You can only view your own recommendations"),
+            404: OpenApiResponse(description="Results not found"),
+            500: OpenApiResponse(description="Server error when computing recommendations"),
+        }
+
+    )
+    def retrieve(self, request, *args, **kwargs):
+        results_id = self.kwargs.get("pk")
+        try:
+            results = RecommendationResults.objects.get(pk=results_id, user=request.user)
+        except RecommendationResults.DoesNotExist:
+            return Response({"detail": "Results not found"}, status=404)
+
+        if request.user != results.user and not request.user.is_staff:
+            return Response({"detail": "You can only view your own recommendations"}, status=403)
+
+        
+        if results.completed_at is None:
+            code = 202
+        else:
+            if results.recommended_tools.count() == 0:
+                return Response({"detail": "No recommendations found for this query"}, status=500)
+            code = 200
+
+        serializer = RecommendationResultsSerializer(results)
+        return Response(serializer.data, status=code)
+
+    @extend_schema(
+        tags=['Recommendations'],
+        description="Delete a recommendation result. Only the user who created the request or staff can delete the results.",
+        responses={
+            204: OpenApiResponse(description="Results deleted successfully"),
+            403: OpenApiResponse(description="You can only delete your own recommendations"),
+            404: OpenApiResponse(description="Results not found"),
+        }
+    )
+    def destroy(self, request, *args, **kwargs):
+        results_id = self.kwargs.get("pk")
+        try:
+            results = RecommendationResults.objects.get(pk=results_id)
+        except RecommendationResults.DoesNotExist:
+            return Response({"detail": "Results not found"}, status=404)
+
+        if request.user != results.user and not request.user.is_staff:
+            return Response({"detail": "You can only delete your own recommendations"}, status=403)
+
+        results.delete()
+        return Response(status=204)
+    
+    @extend_schema(
+        tags=['Recommendations'],
+        description="List all recommendation results. Staff users can see all results, non staff see their own results.",
+        responses={
+            200: RecommendationResultsSerializer(many=True),
+            401: OpenApiResponse(description="Authentication required"),
+        }
+    )
+    def list(self, request, *args, **kwargs):
+        if request.user.is_staff:
+            queryset = RecommendationResults.objects.all()
+        else:
+            queryset = RecommendationResults.objects.filter(user=request.user)
+        serializer = RecommendationResultsSerializer(queryset, many=True)
+        return Response(serializer.data)

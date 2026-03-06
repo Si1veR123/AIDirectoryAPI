@@ -2,13 +2,11 @@ import kagglehub
 import csv
 import os
 from django.core.management.base import BaseCommand
-from django.db import transaction
 
 from tool.models import Tool, Developer, Domain, Accessibility, ContextWindow
 
 FILE_NAME = "AI_Landscape_19k_Tools_2026.csv"
 DATASET_NAME = "harshlakhani2005/ai-tool-directory-2026-10000-real-world-tools"
-
 
 class Command(BaseCommand):
     help = "Load initial dataset into database"

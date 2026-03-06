@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Tool, Developer, Domain, Accessibility, ContextWindow
+from .models import Tool, Developer, Domain, Accessibility, ContextWindow, RecommendationResults
 
 class DeveloperSerializer(serializers.ModelSerializer):
     class Meta:
@@ -31,7 +31,24 @@ class ToolSerializer(serializers.ModelSerializer):
         model = Tool
         fields = '__all__'
 
-class FavouriteToolSerializer(serializers.ModelSerializer):
+class ToolNameSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tool
         fields = ['ai_name']
+
+class RecommendationRequestSerializer(serializers.Serializer):
+    q = serializers.CharField(required=True, help_text="The recommendation query prompt")
+    top_n = serializers.IntegerField(required=False, default=5, min_value=1, max_value=100, help_text="Number of top recommendations to return (default=5, max=100)")
+
+class RecommendationResponseSerializer(serializers.Serializer):
+    detail = serializers.CharField()
+    results_id = serializers.IntegerField()
+    results_url_http = serializers.CharField()
+    results_url_ws = serializers.CharField()
+
+class RecommendationResultsSerializer(serializers.ModelSerializer):
+    recommended_tools = ToolNameSerializer(many=True)
+
+    class Meta:
+        model = RecommendationResults
+        fields = '__all__'

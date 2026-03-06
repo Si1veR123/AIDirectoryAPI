@@ -57,6 +57,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'aitools.urls'
+CHANNELS_URLCONF = 'tool.routing'
 
 TEMPLATES = [
     {
@@ -124,7 +125,7 @@ STATIC_URL = 'static/'
 
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
-        "tool.permissions.IsAdminOrReadOnly",
+        "aitools.permissions.IsAdminOrReadOnly",
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -147,6 +148,13 @@ SPECTACULAR_SETTINGS = {
 }
 
 TASKS = {"default": {"BACKEND": "django.tasks.backends.immediate.ImmediateBackend"}}
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
+}
+
 
 AUTH_USER_MODEL = 'user.CustomUser'
 

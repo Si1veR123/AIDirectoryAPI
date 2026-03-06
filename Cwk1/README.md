@@ -670,3 +670,485 @@ REST_FRAMEWORK = {
 UserRateThrottle applies per authenticated user.
 
 AnonRateThrottle applies per IP for anonymous users.
+
+- i want to add a recommendation engine with nlp. how can i implement this locally with a pretrained model.
+Absolutely — you can add a local NLP-based recommendation engine for your tools API without sending data to external APIs. Here’s a step-by-step roadmap and a concrete implementation approach.
+
+1. Overview of the approach
+
+The idea is to compute semantic embeddings for your tool descriptions/names and then recommend similar tools based on a query or a user's history.
+
+Steps:
+
+Choose a pretrained embedding model
+
+You can use sentence-transformers (BERT-based models) locally.
+
+Example models:
+
+all-MiniLM-L6-v2 → small, fast, good for semantic similarity
+
+paraphrase-MiniLM-L6-v2 → good for short text like tool names/descriptions
+
+Embed your tool data
+
+Precompute embeddings for each tool’s ai_name or description.
+
+Store embeddings in memory, database, or a vector store (FAISS works locally).
+
+Compute similarity
+
+For a user query or tool, embed the query and compute cosine similarity with all tool embeddings.
+
+Return the top-N most similar tools.
+
+Serve via an API endpoint
+
+/tools/recommend/?query=<text>
+
+Returns JSON with recommended tools.
+
+2. Install required libraries
+pip install sentence-transformers numpy scikit-learn
+
+Optional for large datasets:
+
+pip install faiss-cpu
+3. Example Implementation (in-memory, small dataset)
+# recommendations.py
+import numpy as np
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+from myapp.models import Tool  # adjust import to your Tool model
+
+# 1️⃣ Load the embedding model
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+# 2️⃣ Precompute embeddings for all tools
+tools = list(Tool.objects.all())
+tool_texts = [tool.ai_name for tool in tools]  # you can also use descriptions
+tool_embeddings = model.encode(tool_texts, convert_to_numpy=True, show_progress_bar=True)
+
+# 3️⃣ Recommendation function
+def recommend_tools(query: str, top_n=5):
+    query_embedding = model.encode([query], convert_to_numpy=True)
+    similarities = cosine_similarity(query_embedding, tool_embeddings)[0]
+    top_idx = similarities.argsort()[::-1][:top_n]
+    recommendations = [tools[i] for i in top_idx]
+    return recommendations
+4. API Endpoint
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.viewsets import ViewSet
+from .recommendations import recommend_tools
+from .serializers import ToolSerializer
+
+class ToolRecommendationViewSet(ViewSet):
+    serializer_class = ToolSerializer
+    permission_classes = []
+
+    @action(detail=False, methods=['get'])
+    def recommend(self, request):
+        query = request.query_params.get("query")
+        if not query:
+            return Response({"error": "query parameter is required"}, status=400)
+
+        recommended_tools = recommend_tools(query, top_n=5)
+        serializer = ToolSerializer(recommended_tools, many=True)
+        return Response(serializer.data)
+✅ Usage
+GET /tools/recommend/?query=guitar+effects
+
+Returns the top 5 semantically similar tools based on your tool names/descriptions.
+
+5. Optional Optimizations
+
+Use FAISS for large datasets:
+
+Store embeddings in FAISS index for very fast similarity search.
+
+Include multiple fields in embeddings:
+
+Combine ai_name + description + category to enrich recommendations.
+
+Periodic re-embedding:
+
+Recompute embeddings when new tools are added.
+
+Cache embeddings in Redis or pickle to avoid recomputation on server start.
+
+If you want, I can write a full integration for your Django project, including:
+
+/tools/recommend/ endpoint
+
+Optional user history-based personalization
+
+Cached embeddings for fast local search
+
+This would give you a fully working cutting-edge local NLP recommendation engine suitable for that “Outstanding” grade.
+
+Do you want me to do that?
+
+- how does an embedding model work for this. i understand embedding models, but how does a query which will have different language (a question, possibly context etc) map to a same embedding as a description
+Ah, you’re asking the subtle but important part: how an embedding model can match a query with a tool description even if the words are completely different. Let’s unpack it carefully.
+
+1. Embeddings are about meaning, not exact words
+
+When you encode text with a model like SentenceTransformer, it doesn’t just store the words. It converts the text into a high-dimensional vector where:
+
+Semantically similar sentences are close together in vector space.
+
+Words or phrases that mean similar things get mapped to similar directions in the embedding space.
+
+Example:
+
+Text	Embedding (conceptual)
+"guitar distortion pedal"	[0.21, -0.11, 0.34, ...]
+"effects for electric guitar"	[0.19, -0.12, 0.35, ...]
+
+Even though the words are different, the semantic meaning is similar, so the cosine similarity between vectors is high.
+
+2. How queries and descriptions align
+
+A user query might be:
+"recommend a tool for making guitar sounds more crunchy"
+
+Tool description in database:
+"Guitar distortion pedal enhances tone with overdrive effects"
+
+Step-by-step with embeddings:
+
+Model encodes the query → query_vec = model.encode(query)
+
+Model encodes all tool descriptions → tool_vecs = model.encode([tool.description for tool in tools])
+
+Compute similarity → cosine_similarity(query_vec, tool_vecs)
+
+Even though no words match exactly (crunchy vs overdrive, making guitar sounds vs Guitar distortion pedal), the embedding model has learned from large corpora that these concepts co-occur or are similar.
+
+So cosine_similarity ranks the most semantically similar tools highest.
+
+3. Why Sentence Transformers work for this
+
+Standard BERT outputs token embeddings, not sentence-level embeddings. Cosine similarity on token embeddings is noisy.
+
+Sentence Transformers (SBERT) are fine-tuned specifically for semantic similarity tasks.
+
+During training, they learn to map sentences with the same meaning close together.
+
+They are trained on datasets like STS (Semantic Textual Similarity).
+
+That’s why a question, context, or query text often lands close to a relevant description even if the words differ.
+
+4. Caveats
+
+Short or ambiguous queries may be less accurate; adding context helps.
+
+Domain-specific terms: if your tool descriptions have technical jargon (like AI or guitar terms), you may want a domain-specific embedding model or fine-tune SBERT on your dataset.
+
+Embedding similarity is not perfect — you often combine it with filters, tags, or metadata to improve relevance.
+
+✅ Intuition
+
+Think of embedding space as a semantic map:
+
+Each tool description is a point in the map.
+
+Queries “float” into the map, landing near the points whose meaning matches.
+
+Cosine similarity is just measuring closeness in meaning, not exact words.
+
+If you want, I can draw a small diagram showing query embeddings and tool embeddings in the same space, which usually makes this click visually — it’s surprisingly intuitive once you see it.
+
+Do you want me to do that?
+
+- how can i store as JSON in the database, then deserialize and efficiently search at runtime. it should update if a field changes or an item is deleted
+
+Perfect — you can absolutely do a JSON-based embedding store with automatic updates and efficient runtime search, even without a specialized vector DB. Here’s a complete approach tailored for Django:
+
+1. Model setup with JSONField
+from django.db import models
+
+class Tool(models.Model):
+    ai_name = models.CharField(max_length=255)
+    description = models.TextField()
+    embedding = models.JSONField(null=True, blank=True)  # store vector as list of floats
+
+embedding is just a list of floats, e.g., [0.12, -0.23, 0.87, ...].
+
+2. Precompute embeddings when a Tool is saved
+
+Use Django signals to automatically compute embeddings whenever a tool is added or updated:
+
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+from sentence_transformers import SentenceTransformer
+import numpy as np
+
+model = SentenceTransformer("all-MiniLM-L6-v2")
+
+@receiver(post_save, sender=Tool)
+def update_tool_embedding(sender, instance, **kwargs):
+    # Compute embedding for ai_name + description
+    text = f"{instance.ai_name}. {instance.description}"
+    embedding = model.encode([text], convert_to_numpy=True)[0]
+    instance.embedding = embedding.tolist()
+    # Avoid recursion by updating directly without calling save again
+    Tool.objects.filter(pk=instance.pk).update(embedding=instance.embedding)
+3. Maintain an in-memory search index
+
+At server start, load embeddings into a NumPy array for fast similarity search.
+
+Maintain a mapping from index → Tool ID.
+
+import numpy as np
+
+class ToolRecommender:
+    def __init__(self):
+        self.tool_ids = []
+        self.embeddings = None
+        self.reload_index()
+
+    def reload_index(self):
+        tools = Tool.objects.exclude(embedding__isnull=True)
+        self.tool_ids = [tool.id for tool in tools]
+        self.embeddings = np.array([tool.embedding for tool in tools], dtype=np.float32)
+
+    def recommend(self, query, top_n=5):
+        query_embedding = model.encode([query], convert_to_numpy=True)
+        similarities = np.dot(self.embeddings, query_embedding.T).flatten()
+        top_idx = similarities.argsort()[::-1][:top_n]
+        top_tool_ids = [self.tool_ids[i] for i in top_idx]
+        return Tool.objects.filter(id__in=top_tool_ids)
+4. Automatically update index on changes
+
+Use signals for save and delete:
+
+recommender = ToolRecommender()
+
+@receiver(post_save, sender=Tool)
+def refresh_index_on_save(sender, instance, **kwargs):
+    recommender.reload_index()
+
+@receiver(post_delete, sender=Tool)
+def refresh_index_on_delete(sender, instance, **kwargs):
+    recommender.reload_index()
+
+Now, your in-memory index is always up-to-date with the database.
+
+Cosine similarity search at runtime is fast because it operates on a NumPy array.
+
+5. API endpoint
+from rest_framework.viewsets import ViewSet
+from rest_framework.response import Response
+from .serializers import ToolSerializer
+
+class ToolRecommendationViewSet(ViewSet):
+    permission_classes = []
+
+    def list(self, request):
+        query = request.query_params.get("query")
+        if not query:
+            return Response({"error": "query parameter is required"}, status=400)
+        
+        recommended_tools = recommender.recommend(query, top_n=5)
+        serializer = ToolSerializer(recommended_tools, many=True)
+        return Response(serializer.data)
+
+- currently i have an endpoint that you submit a query to and get an id in return. you can call a results endpoint with the id to check if it has finished processing. i have a table of currently running tasks which are updated when complete. is this the best way without async?
+
+What you have described is essentially a polling-based “job queue” approach:
+
+Client submits a request → server returns a job ID.
+
+Client periodically calls a “results” endpoint with the job ID to check status.
+
+Server updates a running tasks table and eventually returns the completed result.
+
+This is a perfectly valid approach without using async processing because it decouples the request from the long-running operation. It’s the simplest and most common pattern for “fire-and-check-later” workflows.
+
+Here’s a breakdown of pros and cons, and some alternatives:
+
+✅ Pros
+
+Simple to implement: No need to worry about async threads, background workers, or websockets.
+
+Stateless client: Client only needs to store the job ID.
+
+Works with existing relational database: Your currently_running_tasks table works as a status tracker.
+
+⚠️ Cons
+
+Polling overhead: Clients may hit your API repeatedly, which is wasteful if jobs are long.
+
+Latency: Results aren’t pushed — the client only knows when it polls.
+
+No real concurrency: If many requests come in, each may block the server unless you run tasks in a separate thread/process.
+
+Alternatives Without Async
+
+Background worker / queue (e.g., Celery, RQ, Django-Q):
+
+The main request just enqueues the job → returns job ID.
+
+Worker updates status when complete.
+
+Still uses your table, but allows real concurrency and doesn’t block web requests.
+
+Server-Sent Events (SSE) or WebSockets:
+
+Instead of polling, the server can push the status to the client.
+
+Requires more setup, but reduces polling overhead.
+
+Long-polling / Deferred Response:
+
+Endpoint can hold the connection open for a few seconds until the task completes.
+
+Combines some benefits of async without fully switching to background jobs.
+
+Risk: Ties up web server threads.
+
+- you should check if user is authenticated first, then check if results id exists or return error message. check user matches results id, then either return results (in the exact format as the other method) or return None
+You're right — the order of checks matters, and with WebSockets you must also explicitly handle error responses because you don't have HTTP status codes. The correct flow is:
+
+Authenticate user
+
+Validate results_id exists
+
+Ensure user owns the results
+
+Accept the socket
+
+Send either:
+
+completed results (same format as REST endpoint)
+
+or a "processing" state
+
+You should not accept the socket until you've validated the request, otherwise unauthorized clients briefly connect.
+
+Below is a cleaner implementation.
+
+Correct RecommendationConsumer
+import json
+from channels.generic.websocket import AsyncWebsocketConsumer
+from asgiref.sync import sync_to_async
+from .models import RecommendationResults
+from .serializers import RecommendationResultsSerializer
+
+
+class RecommendationConsumer(AsyncWebsocketConsumer):
+
+    async def connect(self):
+        user = self.scope["user"]
+
+        # 1. Authentication check
+        if not user or not user.is_authenticated:
+            await self.close()
+            return
+
+        self.results_id = self.scope["url_route"]["kwargs"]["results_id"]
+
+        # 2. Fetch results
+        result = await self.get_results()
+
+        if result is None:
+            await self.accept()
+            await self.send_json({"detail": "Results not found"})
+            await self.close()
+            return
+
+        # 3. Ownership check
+        if result.user_id != user.id and not user.is_staff:
+            await self.accept()
+            await self.send_json({"detail": "You can only view your own recommendations"})
+            await self.close()
+            return
+
+        # 4. Accept socket
+        await self.accept()
+
+        # 5. If results already exist, send them immediately
+        if await self.results_ready(result):
+            data = await self.serialize(result)
+
+            await self.send_json(data)
+
+            # optional: close since job is finished
+            await self.close()
+            return
+
+        # 6. Otherwise subscribe for completion event
+        self.group_name = f"recommend_{self.results_id}"
+
+        await self.channel_layer.group_add(
+            self.group_name,
+            self.channel_name
+        )
+
+
+    async def disconnect(self, close_code):
+        if hasattr(self, "group_name"):
+            await self.channel_layer.group_discard(
+                self.group_name,
+                self.channel_name
+            )
+
+
+    async def recommendation_ready(self, event):
+        await self.send_json(event["results"])
+        await self.close()
+
+
+    # --- DB helpers ---
+
+    @sync_to_async
+    def get_results(self):
+        try:
+            return RecommendationResults.objects.get(pk=self.results_id)
+        except RecommendationResults.DoesNotExist:
+            return None
+
+
+    @sync_to_async
+    def results_ready(self, result):
+        return result.recommended_tools.exists()
+
+
+    @sync_to_async
+    def serialize(self, result):
+        return RecommendationResultsSerializer(result).data
+
+- @receiver(post_save, sender=Tool)
+def update_tool_embedding(sender, instance, **kwargs):
+    if instance.pk:
+        compute_tool_embeddings.enqueue(tool_ids=[instance.pk])
+
+i need this to only update if ai_name or description changes
+
+@receiver(post_save, sender=Tool)
+def update_tool_embedding(sender, instance, created, **kwargs):
+    if created:
+        if instance.pk:
+            compute_tool_embeddings.enqueue(tool_ids=[instance.pk])
+        return
+
+    update_fields = kwargs.get("update_fields")
+
+    # If update_fields is specified, only trigger if relevant fields are included
+    if update_fields is not None:
+        if not ({"ai_name", "description"} & set(update_fields)):
+            return
+
+    # Otherwise, compare with the stored version to detect changes
+    else:
+        try:
+            old = Tool.objects.get(pk=instance.pk)
+        except Tool.DoesNotExist:
+            return
+
+        if old.ai_name == instance.ai_name and old.description == instance.description:
+            return
+
+    compute_tool_embeddings.enqueue(tool_ids=[instance.pk])
