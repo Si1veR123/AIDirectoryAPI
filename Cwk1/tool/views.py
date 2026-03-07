@@ -3,30 +3,47 @@ from .models import Tool, Developer, Domain, Accessibility, ContextWindow, Recom
 from .serializers import ToolSerializer, DeveloperSerializer, DomainSerializer, AccessibilitySerializer, ContextWindowSerializer, RecommendationResultsSerializer, RecommendationResponseSerializer, RecommendationRequestSerializer
 from rest_framework.viewsets import ViewSet
 from rest_framework.pagination import PageNumberPagination
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiResponse
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from .tasks import create_recommendation
 from django.urls import reverse
 from django.conf import settings
 
 
-@extend_schema(tags=['Developers'], description="Manage tool developers. Read only for normal users.")
+# As we are using custom permissions, we set auth=[] for read only endpoints to reflect permissions accurately in the docs.
+@extend_schema_view(
+    list=extend_schema(auth=[]),
+    retrieve=extend_schema(auth=[])
+)
+@extend_schema(tags=['Developers'], description="Manage tool developers. Only staff can modify.")
 class DeveloperViewSet(ModelViewSet):
     queryset = Developer.objects.all()
     serializer_class = DeveloperSerializer
 
-@extend_schema(tags=['Domains'], description="Manage tool domains. Read only for normal users.")
+@extend_schema_view(
+    list=extend_schema(auth=[]),
+    retrieve=extend_schema(auth=[])
+)
+@extend_schema(tags=['Domains'], description="Manage tool domains. Only staff can modify.")
 class DomainViewSet(ModelViewSet):
     queryset = Domain.objects.all()
     serializer_class = DomainSerializer
 
-@extend_schema(tags=['Accessibilities'], description="Manage tool accessibilities. Read only for normal users.")
+@extend_schema_view(
+    list=extend_schema(auth=[]),
+    retrieve=extend_schema(auth=[])
+)
+@extend_schema(tags=['Accessibilities'], description="Manage tool accessibilities. Only staff can modify.")
 class AccessibilityViewSet(ModelViewSet):
     queryset = Accessibility.objects.all()
     serializer_class = AccessibilitySerializer
 
-@extend_schema(tags=['Context Windows'], description="Manage context windows. Read only for normal users.")
+@extend_schema_view(
+    list=extend_schema(auth=[]),
+    retrieve=extend_schema(auth=[])
+)
+@extend_schema(tags=['Context Windows'], description="Manage context windows. Only staff can modify.")
 class ContextWindowViewSet(ModelViewSet):
     queryset = ContextWindow.objects.all()
     serializer_class = ContextWindowSerializer
@@ -36,7 +53,11 @@ class ToolPagination(PageNumberPagination):
     page_size_query_param = 'page_size'  # client can set page size
     max_page_size = 100
 
-@extend_schema(tags=['Tools'], description="Manage AI tools. Read only for normal users.", parameters=[
+@extend_schema_view(
+    list=extend_schema(auth=[]),
+    retrieve=extend_schema(auth=[])
+)
+@extend_schema(tags=['Tools'], description="Manage AI tools. Only staff can modify.", parameters=[
     OpenApiParameter("page", int, description="Page number", required=False, default=1),
     OpenApiParameter("page_size", int, description=f"Results per page. Max: {ToolPagination.max_page_size}", required=False, default=ToolPagination.page_size),
 ])
@@ -121,7 +142,7 @@ Examples:
     tags=['Tool Search']
 )
 class ToolSearchViewSet(ViewSet):
-    permission_classes = []
+    permission_classes = [AllowAny]
     serializer_class = ToolSerializer
     pagination_class = ToolPagination
 
@@ -174,7 +195,7 @@ class ToolSearchViewSet(ViewSet):
             return Response(serializer.data)
 
 
-class RecommendToolView(ViewSet):
+class RecommendToolViewSet(ViewSet):
     queryset = RecommendationResults.objects.all()
     permission_classes = [IsAuthenticated]
 
@@ -184,9 +205,13 @@ class RecommendToolView(ViewSet):
         request=RecommendationRequestSerializer,
         responses={
             201: RecommendationResponseSerializer,
-            400: OpenApiResponse(description="Query parameter 'q' is required"),
+            400: OpenApiResponse(description="Bad request"),
             401: OpenApiResponse(description="Authentication required"),
         },
+        parameters=[
+            OpenApiParameter("q", str, description="The recommendation query prompt", required=True),
+            OpenApiParameter("top_n", int, description="Number of top recommendations to return (default=5, max=100)", required=False, default=5),
+        ]
     )
     def create(self, request, *args, **kwargs):
         query = request.data.get("q")
@@ -194,19 +219,17 @@ class RecommendToolView(ViewSet):
         top_n = max(1, min(int(request.data.get("top_n", 5)), 100))
         if not query:
             return Response({"detail": "Query parameter 'q' is required"}, status=400)
-        
-        if not request.user.is_authenticated:
-            return Response({"detail": "Authentication required"}, status=401)
 
         results = RecommendationResults.objects.create(query=query, user=request.user)
         create_recommendation.enqueue(results_id=results.id, query=query, top_n=top_n)
 
-        return Response({
-            "detail": "Recommendation created successfully",
-            "results_id": results.id,
-            "results_url_http": reverse('recommendation-results-detail', kwargs={'pk': results.id}),
-            "results_url_ws": reverse('recommendation-results-ws', kwargs={'results_id': results.id}, urlconf=settings.CHANNELS_URLCONF),
-        }, status=201)
+        serializer = RecommendationResponseSerializer()
+        serializer.detail = "Recommendation created successfully"
+        serializer.results_id = results.id
+        serializer.results_url_http = reverse('recommendation-results-detail', kwargs={'pk': results.id})
+        serializer.results_url_ws = reverse('recommendation-results-ws', kwargs={'results_id': results.id}, urlconf=settings.CHANNELS_URLCONF)
+
+        return Response(serializer.data, status=201)
     
     @extend_schema(
         tags=['Recommendations'],
@@ -215,10 +238,8 @@ class RecommendToolView(ViewSet):
             200: RecommendationResultsSerializer,
             202: OpenApiResponse(RecommendationResultsSerializer, description="Recommendation is still being processed"),
             403: OpenApiResponse(description="You can only view your own recommendations"),
-            404: OpenApiResponse(description="Results not found"),
-            500: OpenApiResponse(description="Server error when computing recommendations"),
+            404: OpenApiResponse(description="Results not found")
         }
-
     )
     def retrieve(self, request, *args, **kwargs):
         results_id = self.kwargs.get("pk")
@@ -229,13 +250,10 @@ class RecommendToolView(ViewSet):
 
         if request.user != results.user and not request.user.is_staff:
             return Response({"detail": "You can only view your own recommendations"}, status=403)
-
         
         if results.completed_at is None:
             code = 202
         else:
-            if results.recommended_tools.count() == 0:
-                return Response({"detail": "No recommendations found for this query"}, status=500)
             code = 200
 
         serializer = RecommendationResultsSerializer(results)

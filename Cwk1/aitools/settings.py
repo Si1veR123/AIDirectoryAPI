@@ -145,7 +145,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "AI Tools API",
     "DESCRIPTION": "API for navigating a directory of AI tools",
-    "VERSION": "0.0.1",
+    "VERSION": "0.0.1"
 }
 
 TASKS = {"default": {"BACKEND": "django.tasks.backends.immediate.ImmediateBackend"}}
@@ -155,7 +155,6 @@ CHANNEL_LAYERS = {
         "BACKEND": "channels.layers.InMemoryChannelLayer",
     },
 }
-
 
 AUTH_USER_MODEL = 'user.CustomUser'
 

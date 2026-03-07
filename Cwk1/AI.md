@@ -1333,3 +1333,66 @@ application = ProtocolTypeRouter({
     ),
 })
 This replaces AuthMiddlewareStack entirely since you're not using sessions.
+
+- how can i add responses to all apis that specify that a 403 forbidden can be returned due to the default permissions class
+Yes — you can handle this globally in drf-spectacular so that all endpoints automatically document a 403 (or any other common responses) without having to annotate every single view or action. Here’s the clean way:
+
+1️⃣ Use DEFAULT_AUTO_SCHEMA_CLASS + extend_schema overrides
+
+Create a custom AutoSchema class that injects a 403 response for all endpoints:
+
+# your_project/spectacular.py
+from drf_spectacular.openapi import AutoSchema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiResponse
+
+class Default403AutoSchema(AutoSchema):
+    def get_responses(self):
+        # get the normal responses first
+        responses = super().get_responses()
+
+        # inject 403 if not already present
+        if 403 not in responses:
+            responses[403] = OpenApiResponse(
+                description="Forbidden. You do not have permission to access this endpoint."
+            )
+        return responses
+2️⃣ Enable it in your settings
+# settings.py
+SPECTACULAR_SETTINGS = {
+    # ... your existing settings ...
+    'DEFAULT_AUTO_SCHEMA_CLASS': 'your_project.spectacular.Default403AutoSchema',
+}
+
+Now all endpoints will automatically include a 403 Forbidden response in the docs.
+
+3️⃣ Optional: Add 401 too
+
+If you also want to document authentication failures, you can do:
+
+class DefaultAuthAutoSchema(AutoSchema):
+    def get_responses(self):
+        responses = super().get_responses()
+        responses.setdefault(401, OpenApiResponse(description="Authentication credentials were not provided or invalid."))
+        responses.setdefault(403, OpenApiResponse(description="Forbidden. You do not have permission."))
+        return responses
+4️⃣ How it works with your setup
+
+Given your global default:
+
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': ['aitools.permissions.IsAdminOrReadOnly'],
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}
+
+All endpoints that inherit this default now automatically show 403 in the OpenAPI spec.
+
+Public endpoints (AllowAny) will still show 🔓, but 403 will appear in the docs as possible.
+
+✅ This is much cleaner than adding @extend_schema(responses={403: ...}) to every ViewSet or action.
+
+If you want, I can also show a version that automatically detects AllowAny and skips 403 for those endpoints, so your docs are perfectly accurate for public vs restricted endpoints.
+
+Do you want me to do that?

@@ -8,8 +8,7 @@ from tool.models import Tool
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-from rest_framework.exceptions import PermissionDenied
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 
 @extend_schema(tags=['Register'], description="Endpoint for user registration. Open to all users.")
 class RegisterView(generics.CreateAPIView):
@@ -34,37 +33,22 @@ class UserViewSet(ModelViewSet):
     serializer_class = SecureUserSerializer
     permission_classes = [IsAdminUser]
 
-@extend_schema(tags=['Favourites'], 
-description="""Manage favourite tools for users. Endpoints take the ai_name field of the Tool.
-- Normal users can only manage their own favourites.
-- Staff users can manage favourites for any user.""")
-class FavouriteToolViewSet(ViewSet):
+@extend_schema(
+    tags=['Favourites'], 
+    description="Manage favourite tools for current user. Endpoints take the ai_name field of the Tool."
+)
+class CurrentUserFavouriteToolViewSet(ViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = ToolNameSerializer
 
     def get_user(self):
-        user_id = self.kwargs.get("user_id")
-
-        # /user/current/favourites
-        if user_id is None:
-            return self.request.user
-
-        # /user/{id}/favourites
-        if not self.request.user.is_staff:
-            raise PermissionDenied("Only staff can access other users")
-
-        return get_object_or_404(get_user_model(), pk=user_id)
+        return self.request.user
 
     def list(self, request):
         user = self.get_user()
         serializer = ToolNameSerializer(user.favourite_tools.all(), many=True)
         return Response(serializer.data)
 
-    @extend_schema(
-        request=ToolNameSerializer,
-        responses={201: None},
-        description="Add a tool to favourites."
-    )
     def create(self, request):
         user = self.get_user()
 
@@ -84,3 +68,15 @@ class FavouriteToolViewSet(ViewSet):
         user.favourite_tools.remove(tool)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+@extend_schema(
+    tags=['Favourites'], 
+    description="Manage favourite tools for any user. Staff only."
+)
+class UserFavouriteToolViewSet(CurrentUserFavouriteToolViewSet):
+    permission_classes = [IsAdminUser]
+
+    def get_user(self):
+        user_id = self.kwargs.get('user_id')
+        user = get_object_or_404(get_user_model(), pk=user_id)
+        return user

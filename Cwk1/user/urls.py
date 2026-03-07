@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from user.views import RegisterView, CurrentUserDetailView, UserViewSet, FavouriteToolViewSet
+from user.views import RegisterView, CurrentUserDetailView, UserViewSet, CurrentUserFavouriteToolViewSet, UserFavouriteToolViewSet
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
@@ -16,22 +16,22 @@ urlpatterns = [
     path('', include(router.urls)),
 
     path(
-        'user/current/favourites/',
-        FavouriteToolViewSet.as_view({'get': 'list', 'post': 'create'})
+        'current/favourites/',
+        CurrentUserFavouriteToolViewSet.as_view({'get': 'list', 'post': 'create'})
     ),
 
     path(
-        'user/current/favourites/<str:ai_name>/',
-        FavouriteToolViewSet.as_view({'delete': 'destroy'})
+        'current/favourites/<str:ai_name>/',
+        CurrentUserFavouriteToolViewSet.as_view({'delete': 'destroy'})
     ),
 
     path(
         '<int:user_id>/favourites/',
-        FavouriteToolViewSet.as_view({'get': 'list', 'post': 'create'})
+        UserFavouriteToolViewSet.as_view({'get': 'list', 'post': 'create'})
     ),
 
     path(
         '<int:user_id>/favourites/<str:ai_name>/',
-        FavouriteToolViewSet.as_view({'delete': 'destroy'})
+        UserFavouriteToolViewSet.as_view({'delete': 'destroy'})
     ),
 ]
