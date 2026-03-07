@@ -59,6 +59,7 @@ def create_recommendation(results_id: int, query: str, top_n: int = 5):
             "detail": "Error computing recommendations."
         }
         result.completed_at = timezone.now()
+        result.error = "No tools with embeddings available for recommendation."
         result.save()
     else:
         result.recommended_tools.set(recommended_tools)

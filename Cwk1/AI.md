@@ -1152,3 +1152,184 @@ def update_tool_embedding(sender, instance, created, **kwargs):
             return
 
     compute_tool_embeddings.enqueue(tool_ids=[instance.pk])
+- i have this api: /api/tools/recommend/ request: { "q": "string", "top_n": 5 } returns: { "detail": "string", "results_id": 0, "results_url_http": "string", "results_url_ws": "string" } you can connect to the results_url_ws and it returns this response when data is ready: { "type": "recommendation_ready", "detail": { "id": 0, "recommended_tools": [ { "ai_name": "string" } ], "query": "string", "started_at": "2026-03-07T14:07:03.110Z", "completed_at": "2026-03-07T14:07:03.110Z", "user": 0 }, } it should have a username and password const variable that is used to get a jwt token from /api/user/token/: request: { "username": "string", "password": "string" } response: { "access": "string", "refresh": "string" } write a python script that demonstrates this.
+
+Below is a simple end-to-end demo script that:
+
+Logs in with username/password to get a JWT.
+
+Calls /api/tools/recommend/ with the query.
+
+Connects to the returned WebSocket URL.
+
+Waits until the recommendation_ready message arrives and prints it.
+
+It uses:
+
+requests for HTTP
+
+websocket-client for WebSocket
+
+Install deps if needed:
+
+pip install requests websocket-client
+import json
+import requests
+import websocket
+
+BASE_URL = "http://localhost:8000"
+
+USERNAME = "your_username"
+PASSWORD = "your_password"
+
+QUERY = "python ai tools"
+TOP_N = 5
+
+
+def get_token():
+    url = f"{BASE_URL}/api/user/token/"
+    payload = {
+        "username": USERNAME,
+        "password": PASSWORD,
+    }
+
+    r = requests.post(url, json=payload)
+    r.raise_for_status()
+
+    data = r.json()
+    return data["access"]
+
+
+def request_recommendations(token):
+    url = f"{BASE_URL}/api/tools/recommend/"
+
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+
+    payload = {
+        "q": QUERY,
+        "top_n": TOP_N
+    }
+
+    r = requests.post(url, json=payload, headers=headers)
+    r.raise_for_status()
+
+    data = r.json()
+
+    print("Recommendation request accepted:")
+    print(json.dumps(data, indent=2))
+
+    return data["results_url_ws"]
+
+
+def wait_for_results(ws_url, token):
+    # If your websocket auth uses query params, add token here instead
+    ws = websocket.create_connection(
+        ws_url,
+        header=[f"Authorization: Bearer {token}"]
+    )
+
+    print("\nConnected to websocket. Waiting for results...\n")
+
+    while True:
+        msg = ws.recv()
+        data = json.loads(msg)
+
+        print("Received message:")
+        print(json.dumps(data, indent=2))
+
+        if data.get("type") == "recommendation_ready":
+            print("\nRecommendations are ready!")
+            break
+
+    ws.close()
+
+
+def main():
+    print("Getting JWT token...")
+    token = get_token()
+
+    print("Requesting recommendations...")
+    ws_url = request_recommendations(token)
+
+    print("Connecting to websocket...")
+    wait_for_results(ws_url, token)
+
+
+if __name__ == "__main__":
+    main()
+Example flow when running
+Getting JWT token...
+Requesting recommendations...
+
+Recommendation request accepted:
+{
+  "detail": "Recommendation started",
+  "results_id": 7,
+  "results_url_http": "...",
+  "results_url_ws": "ws://localhost:8000/ws/recommend/7/"
+}
+
+Connecting to websocket...
+
+Connected to websocket. Waiting for results...
+
+Received message:
+{
+  "type": "recommendation_ready",
+  "detail": {
+    "id": 7,
+    "recommended_tools": [
+      {"ai_name": "LangChain"},
+      {"ai_name": "LlamaIndex"}
+    ]
+  }
+}
+
+Recommendations are ready!
+
+- in my websocket requests, the user is not authenticated correctly. i am using jwt tokens sent in the header. how can i have a middleware that handles this authentication for websockets?
+AuthMiddlewareStack only handles session-based auth, it doesn't understand JWT tokens. You need a custom middleware.
+Option 1: JWT middleware for Channels (simplest):
+python# middleware.py
+from channels.middleware import BaseMiddleware
+from channels.db import database_sync_to_async
+from django.contrib.auth.models import AnonymousUser
+from rest_framework_simplejwt.tokens import AccessToken
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+@database_sync_to_async
+def get_user_from_token(token):
+    try:
+        validated = AccessToken(token)
+        return User.objects.get(id=validated["user_id"])
+    except Exception:
+        return AnonymousUser()
+
+class JWTAuthMiddleware(BaseMiddleware):
+    async def __call__(self, scope, receive, send):
+        headers = dict(scope["headers"])
+        token = None
+
+        if b"authorization" in headers:
+            auth = headers[b"authorization"].decode()
+            if auth.startswith("Bearer "):
+                token = auth.split(" ")[1]
+
+        scope["user"] = await get_user_from_token(token) if token else AnonymousUser()
+        return await super().__call__(scope, receive, send)
+Then update asgi.py:
+pythonfrom .middleware import JWTAuthMiddleware  # adjust import path
+
+application = ProtocolTypeRouter({
+    "http": django_application,
+    "websocket": JWTAuthMiddleware(
+        URLRouter(
+            tool.routing.urlpatterns
+        )
+    ),
+})
+This replaces AuthMiddlewareStack entirely since you're not using sessions.

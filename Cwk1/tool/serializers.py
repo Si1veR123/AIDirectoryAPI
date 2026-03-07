@@ -29,7 +29,7 @@ class ToolSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Tool
-        fields = '__all__'
+        exclude = ['embedding']
 
 class ToolNameSerializer(serializers.ModelSerializer):
     class Meta:
@@ -47,7 +47,7 @@ class RecommendationResponseSerializer(serializers.Serializer):
     results_url_ws = serializers.CharField()
 
 class RecommendationResultsSerializer(serializers.ModelSerializer):
-    recommended_tools = ToolNameSerializer(many=True)
+    recommended_tools = ToolSerializer(many=True)
 
     class Meta:
         model = RecommendationResults

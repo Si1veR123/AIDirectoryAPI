@@ -13,6 +13,8 @@ sentence-transformers = "*"
 numpy = "*"
 scikit-learn = "*"
 channels = "*"
+websockets = "*"
+daphne = "*"
 
 [requires]
 python_version = "3.13"

@@ -59,3 +59,4 @@ class RecommendationResults(models.Model):
     recommended_tools = models.ManyToManyField(Tool, blank=True)
     started_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(blank=True, null=True)
+    error = models.TextField(blank=True, null=True)
