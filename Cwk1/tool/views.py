@@ -3,7 +3,7 @@ from .models import Tool, Developer, Domain, Accessibility, ContextWindow, Recom
 from .serializers import ToolSerializer, DeveloperSerializer, DomainSerializer, AccessibilitySerializer, ContextWindowSerializer, RecommendationResultsSerializer, RecommendationResponseSerializer, RecommendationRequestSerializer
 from rest_framework.viewsets import ViewSet
 from rest_framework.pagination import PageNumberPagination
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiResponse
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiExample, OpenApiResponse
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .tasks import create_recommendation
@@ -139,7 +139,17 @@ Examples:
     /tools/search?sort-by=popularity_votes&order=desc&page=2&page_size=50
 """,
     parameters=build_search_params(),  # your existing dynamic params builder
-    tags=['Tool Search']
+    tags=['Tool Search'],
+    examples=[
+        OpenApiExample(
+            "Search by name",
+            value="/tools/search?q=vision"
+        ),
+        OpenApiExample(
+            "Filter by domain",
+            value="/tools/search?primary_domain=nlp"
+        ),
+    ]
 )
 class ToolSearchViewSet(ViewSet):
     permission_classes = [AllowAny]
@@ -284,6 +294,9 @@ class RecommendToolViewSet(ViewSet):
     @extend_schema(
         tags=['Recommendations'],
         description="List all recommendation results. Staff users can see all results, non staff see their own results.",
+        parameters=[
+            OpenApiParameter("completed", bool, description="Filter by completion status. true for completed, false for pending.", required=False)
+        ],
         responses={
             200: RecommendationResultsSerializer(many=True),
             401: OpenApiResponse(description="Authentication required"),
@@ -294,5 +307,14 @@ class RecommendToolViewSet(ViewSet):
             queryset = RecommendationResults.objects.all()
         else:
             queryset = RecommendationResults.objects.filter(user=request.user)
+
+        if request.query_params.get("completed"):
+            try:
+                completed = bool(request.query_params.get("completed").lower())
+            except ValueError:
+                pass
+            finally:
+                queryset = queryset.filter(completed_at__isnull=not completed)
+
         serializer = RecommendationResultsSerializer(queryset, many=True)
         return Response(serializer.data)
