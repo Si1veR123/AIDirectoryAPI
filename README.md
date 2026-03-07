@@ -1,5 +1,25 @@
-Setup:
-```
+# AI Tools Registry API
+A Django REST API for managing and exploring AI tools, with user personalization and NLP-powered recommendations.
+
+## Features
+- Tool registry: browse, add, and retrieve AI tools.
+
+- User favourites: save favourite tools and manage them per user.
+
+- Email alerts: notify users about new tools matching their interests.
+
+- NLP-powered recommendations: suggest relevant tools based on user queries.
+
+- Async job processing: submit long-running jobs (e.g., NLP processing) and poll for results.
+
+- JWT authentication: secure endpoints with token-based auth.
+
+- Permissions: fine-grained access control: public, authenticated users, or staff-only.
+
+- OpenAPI docs: auto-generated Swagger/Redoc via `drf-spectacular`.
+
+## Setup
+```bash
 # Install dependencies in Pipenv environment
 pipenv install
 
