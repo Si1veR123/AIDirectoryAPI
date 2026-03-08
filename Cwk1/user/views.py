@@ -2,7 +2,7 @@ from rest_framework import generics
 from rest_framework.viewsets import ModelViewSet, ViewSet
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from django.contrib.auth import get_user_model
-from .serializers import SecureUserSerializer
+from .serializers import SecureUserSerializer, StandardUserSerializer
 from tool.serializers import ToolNameSerializer
 from tool.models import Tool
 from rest_framework.response import Response
@@ -13,13 +13,13 @@ from drf_spectacular.utils import extend_schema, extend_schema_view
 @extend_schema(tags=['Register'], description="Endpoint for user registration. Open to all users.")
 class RegisterView(generics.CreateAPIView):
     queryset = get_user_model().objects.all()
-    serializer_class = SecureUserSerializer
+    serializer_class = StandardUserSerializer
     permission_classes = [AllowAny]
 
 @extend_schema(tags=['Current User'], description="Retrieve, update, or delete the current user's profile. Authenticated users only.")
 class CurrentUserDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = get_user_model().objects.all()
-    serializer_class = SecureUserSerializer
+    serializer_class = StandardUserSerializer
     permission_classes = [IsAuthenticated]
 
     def get_object(self):

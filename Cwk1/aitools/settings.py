@@ -148,6 +148,7 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "0.0.1"
 }
 
+# For production, this should be replaced with a production-ready backend like Redis
 TASKS = {"default": {"BACKEND": "django.tasks.backends.immediate.ImmediateBackend"}}
 
 CHANNEL_LAYERS = {

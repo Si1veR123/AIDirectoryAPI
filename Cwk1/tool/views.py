@@ -211,17 +211,13 @@ class RecommendToolViewSet(ViewSet):
 
     @extend_schema(
         tags=["Recommendations"],
-        description="Create a recommendation request based on a query.",
+        description="Create a recommendation request based on a query. Takes a query 'q' and optional 'top_n' for number of results in the request body.",
         request=RecommendationRequestSerializer,
         responses={
             201: RecommendationResponseSerializer,
             400: OpenApiResponse(description="Bad request"),
             401: OpenApiResponse(description="Authentication required"),
-        },
-        parameters=[
-            OpenApiParameter("q", str, description="The recommendation query prompt", required=True),
-            OpenApiParameter("top_n", int, description="Number of top recommendations to return (default=5, max=100)", required=False, default=5),
-        ]
+        }
     )
     def create(self, request, *args, **kwargs):
         query = request.data.get("q")
@@ -233,11 +229,19 @@ class RecommendToolViewSet(ViewSet):
         results = RecommendationResults.objects.create(query=query, user=request.user)
         create_recommendation.enqueue(results_id=results.id, query=query, top_n=top_n)
 
-        serializer = RecommendationResponseSerializer()
-        serializer.detail = "Recommendation created successfully"
-        serializer.results_id = results.id
-        serializer.results_url_http = reverse('recommendation-results-detail', kwargs={'pk': results.id})
-        serializer.results_url_ws = reverse('recommendation-results-ws', kwargs={'results_id': results.id}, urlconf=settings.CHANNELS_URLCONF)
+        serializer = RecommendationResponseSerializer({
+            "detail": "Recommendation created successfully",
+            "results_id": results.id,
+            "results_url_http": reverse(
+                "recommendation-results-detail",
+                kwargs={"pk": results.id}
+            ),
+            "results_url_ws": reverse(
+                "recommendation-results-ws",
+                kwargs={"results_id": results.id},
+                urlconf=settings.CHANNELS_URLCONF
+            ),
+        })
 
         return Response(serializer.data, status=201)
     

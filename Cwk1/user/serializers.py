@@ -81,3 +81,8 @@ class SecureUserSerializer(serializers.ModelSerializer):
 
         instance.save()
         return instance
+
+class StandardUserSerializer(SecureUserSerializer):
+    class Meta:
+        model = get_user_model()
+        fields = list(SecureUserSerializer.USER_FIELDS)
