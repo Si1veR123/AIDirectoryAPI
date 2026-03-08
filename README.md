@@ -87,6 +87,7 @@ Endpoints to manage NLP powered tool recommendations from a query. This is power
 - `GET /api/tools/recommend/` - get a list of all recommendation results. Query parameter `completed=true|false` can be used to filter completed recommendations. Normal users can only access their own results
 - `POST /api/tools/recommend/` - create a recommendation by a natural language query and number of tools to recommend
 - `GET/DELETE /api/tools/recommend/{id}/` - get/delete the results of a specific recommendation task by ID
+- `ws://hostserver.com/ws/recommend/{id}` - creating a websocket connection to this endpoint will return the recommendation results when they are available
 
 ### Tool Subtables
 REST endpoints to manage categories of a Tool object. Read only for non-staff.
