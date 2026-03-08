@@ -30,6 +30,8 @@ python manage.py runserver
 - Tool registry: browse, add, and retrieve AI tools.
 - User favourites: save favourite tools and manage them per user.
 - Email alerts: notify users about new tools matching their interests.
+    - Enabled by providing the environment variable: `AIDIRECTORYAPI_EMAIL_CREDENTIALS=email;apppassword`
+    - Default settings are configured for an AOL SMTP server but can be modified by `EMAIL_HOST` and `EMAIL_PORT` settings
 - NLP-powered recommendations: recommend relevant tools based on user queries.
 - Async job processing: submit long-running jobs (e.g., NLP processing). Receive results via HTTP polling or Websocket connection.
 - JWT authentication: secure endpoints with token-based auth.
