@@ -1,6 +1,8 @@
 # AI Tools Registry API
 A Django REST API for managing and exploring AI tools with NLP-powered recommendations.
 
+Models are based on the Kaggle dataset [here](https://www.kaggle.com/datasets/harshlakhani2005/ai-tool-directory-2026-10000-real-world-tools).
+
 ## Setup
 ```bash
 # (In /Cwk1 directory) Install dependencies in Pipenv environment
@@ -36,6 +38,7 @@ python manage.py runserver
 - Async job processing: submit long-running jobs (e.g., NLP processing). Receive results via HTTP polling or Websocket connection.
 - JWT authentication: secure endpoints with token-based auth.
 - Permissions: fine-grained access control: public, authenticated users, or staff-only.
+- Throttling: endpoints are throttled to prevent excessive usage. Rate is higher for authenticated users.
 - OpenAPI docs: auto-generated Swagger/Redoc via `drf-spectacular`.
 
 ## API Overview
