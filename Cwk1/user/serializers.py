@@ -42,9 +42,17 @@ class SecureUserSerializer(serializers.ModelSerializer):
                     code="permission_denied"
                 )
 
-        # Check field permissions
-        for field in attrs.keys():
-            if field not in allowed_fields:
+        # Get the fields that were actually provided in the request
+        # (not just defaults from the model)
+        request = self.context.get("request")
+        if request and hasattr(request, 'data'):
+            provided_fields = set(request.data.keys())
+        else:
+            provided_fields = set(attrs.keys())
+
+        # Check field permissions only for fields explicitly provided
+        for field in provided_fields:
+            if field in attrs and field not in allowed_fields:
                 raise serializers.ValidationError(
                     f"You do not have permission to modify '{field}'.",
                     code="permission_denied"
@@ -67,17 +75,43 @@ class SecureUserSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, data):
+        # Remove many-to-many fields as they must be set after the user is created
+        favourite_tools = data.pop("favourite_tools", None)
+        groups = data.pop("groups", None)
+        user_permissions = data.pop("user_permissions", None)
+        
         user = get_user_model().objects.create_user(**data)
+        
+        # Set many-to-many relationships after user creation
+        if favourite_tools is not None:
+            user.favourite_tools.set(favourite_tools)
+        if groups is not None:
+            user.groups.set(groups)
+        if user_permissions is not None:
+            user.user_permissions.set(user_permissions)
+        
         return user
 
     def update(self, instance, data):
         password = data.pop("password", None)
+        favourite_tools = data.pop("favourite_tools", None)
+        groups = data.pop("groups", None)
+        user_permissions = data.pop("user_permissions", None)
+        
         if password:
             instance.set_password(password)
             
         # Update all other fields normally
         for attr, value in data.items():
             setattr(instance, attr, value)
+        
+        # Handle many-to-many fields separately
+        if favourite_tools is not None:
+            instance.favourite_tools.set(favourite_tools)
+        if groups is not None:
+            instance.groups.set(groups)
+        if user_permissions is not None:
+            instance.user_permissions.set(user_permissions)
 
         instance.save()
         return instance

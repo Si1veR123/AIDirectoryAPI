@@ -53,6 +53,9 @@ class Tool(models.Model):
     website_url = models.URLField()
     embedding = models.JSONField(null=True, blank=True)
 
+    class Meta:
+        ordering = ['id']
+
 class RecommendationResults(models.Model):
     user = models.ForeignKey('user.CustomUser', on_delete=models.CASCADE)
     query = models.TextField()

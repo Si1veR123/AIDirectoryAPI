@@ -44,12 +44,12 @@ class CurrentUserFavouriteToolViewSet(ViewSet):
     def get_user(self):
         return self.request.user
 
-    def list(self, request):
+    def list(self, request, **kwargs):
         user = self.get_user()
         serializer = ToolNameSerializer(user.favourite_tools.all(), many=True)
         return Response(serializer.data)
 
-    def create(self, request):
+    def create(self, request, **kwargs):
         user = self.get_user()
 
         serializer = ToolNameSerializer(data=request.data)
@@ -61,7 +61,7 @@ class CurrentUserFavouriteToolViewSet(ViewSet):
 
         return Response(status=status.HTTP_201_CREATED)
 
-    def destroy(self, request, ai_name=None):
+    def destroy(self, request, ai_name=None, **kwargs):
         user = self.get_user()
 
         tool = get_object_or_404(Tool, ai_name=ai_name)

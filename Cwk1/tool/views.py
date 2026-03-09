@@ -258,7 +258,7 @@ class RecommendToolViewSet(ViewSet):
     def retrieve(self, request, *args, **kwargs):
         results_id = self.kwargs.get("pk")
         try:
-            results = RecommendationResults.objects.get(pk=results_id, user=request.user)
+            results = RecommendationResults.objects.get(pk=results_id)
         except RecommendationResults.DoesNotExist:
             return Response({"detail": "Results not found"}, status=404)
 
