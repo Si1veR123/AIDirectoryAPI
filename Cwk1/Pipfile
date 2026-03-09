@@ -15,6 +15,9 @@ scikit-learn = "*"
 channels = "*"
 websockets = "*"
 daphne = "*"
+psycopg = {extras = ["binary"], version = "*"}
+django-tasks = "*"
+channels-redis = "*"
 
 [requires]
 python_version = "3.13"

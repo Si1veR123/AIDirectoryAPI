@@ -44,7 +44,8 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'user',
     'tool',
-    'drf_spectacular'
+    'drf_spectacular',
+    'django_tasks_db',
 ]
 
 MIDDLEWARE = [
@@ -82,9 +83,14 @@ ASGI_APPLICATION = 'aitools.asgi.application'
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        # Requires a PostgreSQL database, running locally, named "aitools_db"
+        "NAME": "aitools_db",
+        "USER": os.environ.get("AITOOLS_DB_USER", "aitools_user"),
+        "PASSWORD": os.environ.get("AITOOLS_DB_PASSWORD", None),
+        "HOST": "localhost",
+        "PORT": "5432",
     }
 }
 
@@ -148,12 +154,20 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "0.0.1"
 }
 
-# For production, this should be replaced with a production-ready backend like Redis
-TASKS = {"default": {"BACKEND": "django.tasks.backends.immediate.ImmediateBackend"}}
+TASKS = {
+    "default": {
+        "BACKEND": "django_tasks_db.DatabaseBackend",
+        "QUEUES": ["default"]
+    }
+}
 
+# In produciton we use Redis for channels
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer",
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
     },
 }
 

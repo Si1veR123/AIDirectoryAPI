@@ -138,7 +138,7 @@ Examples:
     /tools/search?popularity_votes-min=1000&popularity_votes-max=10000
     /tools/search?sort-by=popularity_votes&order=desc&page=2&page_size=50
 """,
-    parameters=build_search_params(),  # your existing dynamic params builder
+    parameters=build_search_params(),
     tags=['Tool Search'],
     examples=[
         OpenApiExample(
