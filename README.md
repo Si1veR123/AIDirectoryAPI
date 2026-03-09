@@ -42,7 +42,7 @@ python manage.py runserver
 - OpenAPI docs: auto-generated Swagger/Redoc via `drf-spectacular`.
 
 ## API Overview
-See Swagger Documentation in the PDF for details such as payload and response formats.
+See Swagger Documentation in the [PDF](AI%20Tools%20API.pdf) for details such as payload and response formats.
 
 ### Register
 - `POST /api/user/register/` - create a user account
