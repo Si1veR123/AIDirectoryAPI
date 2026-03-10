@@ -19,7 +19,8 @@
 export API=http://localhost:8000
 
 # 1
-curl "$API/api/tools/?page=1&page_size=5"
+curl "$API/api/tools/?page=1&page_size=3"
+curl "$API/api/tools/?page=2&page_size=3"
 
 # 2
 curl "$API/api/tools/search/?q=video&sort-by=ai_name&order=asc&page_size=5"

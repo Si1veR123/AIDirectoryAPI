@@ -194,7 +194,7 @@ class ToolSearchViewSet(ViewSet):
             queryset = queryset.order_by(sort_by)
 
         # --- pagination ---
-        if 'page' in params:
+        if 'page' in params or 'page_size' in params:
             paginator = self.pagination_class()
             page = paginator.paginate_queryset(queryset, request)
             serializer = ToolSerializer(page, many=True)
