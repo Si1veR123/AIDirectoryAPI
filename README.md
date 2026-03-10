@@ -3,6 +3,8 @@ A Django REST API for managing and exploring AI tools with NLP-powered recommend
 
 Models are based on the Kaggle dataset [here](https://www.kaggle.com/datasets/harshlakhani2005/ai-tool-directory-2026-10000-real-world-tools).
 
+Presentation slides [here](https://docs.google.com/presentation/d/1Fn1ep_j_10npwcVNG09A1xmPbFCN9b2-84frUnoNELk/edit?usp=sharing).
+
 ## Full Setup
 Steps 3 and 4 can be skipped if the existing database is used. It has a superuser with the credentials:
 ```
