@@ -1,93 +1,95 @@
-# Plan
-1) Intro
-2) Open endpoints
-    - Paginated tool list
-    - Search
-    - Get developers
-3) Register User
-4) Login user
-5) Current user GET
-6) Current user PATCH
-7) Create recommendation
-9) HTTP recommendation result
-8) Websocket python demo
-10) Get superuser token
-11) List all users
-
-
 # Script
 export API=http://localhost:8000
 
-# 1
-curl "$API/api/tools/?page=1&page_size=3"
-curl "$API/api/tools/?page=2&page_size=3"
+## 1 - GET Tools Pagination
+curl "$API/api/tools/?page=1&page_size=3" | jq
 
-# 2
-curl "$API/api/tools/search/?q=video&sort-by=ai_name&order=asc&page_size=5"
+curl "$API/api/tools/?page=2&page_size=3" | jq
 
-# 3
-curl "$API/api/tools/developers/"
+## 2 - Search tools
+curl "$API/api/tools/search/?q=video&sort-by=popularity_votes&order=desc&page_size=5" | jq
 
-# 4
+## 3 - GET domains sub table
+curl "$API/api/tools/domains/" | jq
+
+## 4 - Register account - bad password, and correct password
 curl -X POST "$API/api/user/register/" \
 -H "Content-Type: application/json" \
 -d '{
-  "username": "demo_user",
+  "username": "demo",
   "email": "demo@example.com",
   "password": "password123"
-}'
+}'  | jq
 
-# 5
-curl "$API/api/user/current/" \
--H "Authorization: Bearer $TOKEN"
-
-# 6
-curl -X POST "$API/api/user/token/" \
+curl -X POST "$API/api/user/register/" \
 -H "Content-Type: application/json" \
 -d '{
-  "username": "demo_user",
-  "password": "password123"
-}'
+  "username": "demo",
+  "email": "demo@example.com",
+  "password": "Something_123",
+  "interested_domain": "Audio",
+  "email_alerts": true
+}'  | jq
 
-# 6
+## 5 - Login
+curl -X POST "$API/api/user/token/" -H "Content-Type: application/json" \
+-d '{
+  "username": "demo",
+  "password": "Something_123"
+}' | jq
+
+export TOKEN=
+
+## 6 - Current User
+curl "$API/api/user/current/" -H "Authorization: Bearer $TOKEN"  | jq
+
+## 7 - Update email
 curl -X PATCH "$API/api/user/current/" \
 -H "Authorization: Bearer $TOKEN" \
 -H "Content-Type: application/json" \
 -d '{
-  "email": "updated@example.com"
-}'
+  "email": "sc23cg@leeds.ac.uk"
+}' | jq
 
 curl "$API/api/user/current/" \
--H "Authorization: Bearer $TOKEN"
+-H "Authorization: Bearer $TOKEN" | jq
 
-# 7
+## 8 - HTTP recommendations
 curl -X POST "$API/api/tools/recommend/" \
 -H "Authorization: Bearer $TOKEN" \
 -H "Content-Type: application/json" \
 -d '{
   "q": "AI tool for editing youtube videos",
   "top_n": 5
-}'
+}' | jq
 
+## 9 - Get results
+curl "$API/api/tools/recommend/1/" \
+-H "Authorization: Bearer $TOKEN" | jq
 
-# 8
-curl "$API/api/tools/recommend/$RESULT_ID/" \
--H "Authorization: Bearer $TOKEN"
-
-
-# 9
+## 10 - Websocket recommendations
 python websocket_demo.py
 
-# 10
+## 11 - Superuser login
 curl -X POST "$API/api/user/token/" \
 -H "Content-Type: application/json" \
 -d '{
-  "username": "admin",
-  "password": "adminpassword"
-}'
+  "username": "superuser",
+  "password": "superuser"
+}' | jq
 
 export ADMIN_TOKEN=
 
-# 11
+## 12 - Email Test
+curl -X PATCH "$API/api/tools/1000/" \
+-H "Authorization: Bearer $ADMIN_TOKEN" \
+-H "Content-Type: application/json" \
+-d '{
+  "primary_domain": "Audio"
+}' | jq
+
+## 13 - Get ALL users - shows permissions
+curl "$API/api/user/" | jq
+
 curl "$API/api/user/" \
--H "Authorization: Bearer $ADMIN_TOKEN"
+-H "Authorization: Bearer $ADMIN_TOKEN" | jq

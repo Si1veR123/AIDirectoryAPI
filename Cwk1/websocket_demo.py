@@ -7,7 +7,7 @@ BASE_URL = "http://localhost:8000"
 BASE_WS_URL = "ws://localhost:8000"
 
 USERNAME = "superuser"
-PASSWORD = "Something123"
+PASSWORD = "superuser"
 
 QUERY = "ai for analyzing medical images"
 TOP_N = 10
