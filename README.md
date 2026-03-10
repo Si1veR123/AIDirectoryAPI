@@ -3,25 +3,31 @@ A Django REST API for managing and exploring AI tools with NLP-powered recommend
 
 Models are based on the Kaggle dataset [here](https://www.kaggle.com/datasets/harshlakhani2005/ai-tool-directory-2026-10000-real-world-tools).
 
-## Setup
+## Full Setup
+Steps 3 and 4 can be skipped if the existing database is used. It has a superuser with the credentials:
+```
+User: superuser
+Pass: superuser
+```
+
 ```bash
-# (In /Cwk1 directory) Install dependencies in Pipenv environment
+# 1) (In /Cwk1 directory) Install dependencies in Pipenv environment
 pipenv install
 
-# Enter Pipenv shell
+# 2) Enter Pipenv shell
 pipenv shell
 
-# Create database
+# 3) Create database
 python manage.py migrate
 
-# Fill with dataset
+# 4) Set up superuser
+python manage.py createsuperuser
+
+# 5) Fill with dataset
 python manage.py download_dataset
 
-# Compute embeddings for NLP queries
+# 6) Compute embeddings for NLP queries
 python manage.py compute_embeddings
-
-# Optionally, set up superuser
-python manage.py createsuperuser
 
 # Run server
 python manage.py runserver
